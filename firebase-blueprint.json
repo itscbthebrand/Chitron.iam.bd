@@ -1,0 +1,84 @@
+{
+  "entities": {
+    "Post": {
+      "title": "Social Post",
+      "description": "A post on the social portfolio",
+      "type": "object",
+      "properties": {
+        "content": { "type": "string" },
+        "mediaUrl": { "type": "string" },
+        "author": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["content", "author", "createdAt"]
+    },
+    "Story": {
+      "title": "Story",
+      "description": "A 24-hour temporary story",
+      "type": "object",
+      "properties": {
+        "mediaUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Visitor message and admin reply",
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string" },
+        "visitorName": { "type": "string" },
+        "text": { "type": "string" },
+        "reply": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "platform": { "type": "string" },
+        "telegramMessageId": { "type": "string" }
+      }
+    },
+    "VisitorLog": {
+      "title": "Visitor Log",
+      "description": "Analytics for site visits",
+      "type": "object",
+      "properties": {
+        "ip": { "type": "string" },
+        "userAgent": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    },
+    "AdminConfig": {
+      "title": "Admin Configuration",
+      "description": "MFA and security settings",
+      "type": "object",
+      "properties": {
+        "mfaEnabled": { "type": "boolean" },
+        "mfaSecret": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "admin_config/main": {
+      "schema": "AdminConfig",
+      "description": "Global admin security settings"
+    },
+    "admin_codes/{codeId}": {
+      "schema": "object",
+      "description": "Temporary 12-digit telegram codes"
+    },
+    "posts/{postId}": {
+      "schema": "Post",
+      "description": "Main feed posts"
+    },
+    "stories/{storyId}": {
+      "schema": "Story",
+      "description": "Temporary stories"
+    },
+    "messages/{messageId}": {
+      "schema": "Message",
+      "description": "Interactions between visitors and admin"
+    },
+    "visitor_logs/{logId}": {
+      "schema": "VisitorLog",
+      "description": "Website tracking logs"
+    }
+  }
+}
