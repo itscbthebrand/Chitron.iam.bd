@@ -6,6 +6,24 @@ import { cn } from "../lib/utils";
 
 export default function Navbar() {
   const { user, profile, logout } = useFirebase();
+  const [hasNewMessages, setHasNewMessages] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    const q = query(
+      collection(db, "messages"),
+      where("authorId", "==", user.uid),
+      where("platform", "==", "telegram_reply"),
+      limit(1)
+    );
+    return onSnapshot(q, (snap) => {
+      if (!snap.empty) {
+        // Simple heuristic: if we have any reply, show a dot
+        // In a real app, we'd check against a "lastRead" timestamp
+        setHasNewMessages(true);
+      }
+    });
+  }, [user]);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-40 px-6 py-6 border-b border-white/5 bg-black/50 backdrop-blur-md">
@@ -24,7 +42,14 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-8 text-[10px] uppercase tracking-[0.2em] font-black text-white/30">
             <Link to="/" className="hover:text-white transition-colors">Feed</Link>
             <Link to="/about" className="hover:text-white transition-colors">Architect</Link>
-            {user && <Link to="/messages" className="hover:text-white transition-colors flex items-center gap-1.5 underline decoration-blue-500/30">Signals</Link>}
+            {user && (
+              <Link to="/messages" className="relative hover:text-white transition-colors flex items-center gap-1.5 underline decoration-blue-500/30">
+                Signals
+                {hasNewMessages && (
+                  <span className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse shadow-lg shadow-blue-500/50" />
+                )}
+              </Link>
+            )}
           </div>
 
           <div className="flex items-center gap-3">

@@ -77,6 +77,10 @@ export default function Login() {
           {error && <p className="text-red-500 text-[10px] uppercase font-bold text-center">{error}</p>}
         </form>
 
+        <div className="pt-4 text-center opacity-10 text-[8px] uppercase tracking-widest font-black">
+           /** Author: Chitron Bhattacharjee **/
+        </div>
+
         <p className="text-center text-[10px] text-white/20 uppercase tracking-widest font-bold">
           New signature? <Link to="/signup" className="text-blue-500 hover:underline">Construct Profile</Link>
         </p>

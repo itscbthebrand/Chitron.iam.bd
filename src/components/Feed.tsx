@@ -48,20 +48,31 @@ export default function Feed() {
   return (
     <div className="space-y-12">
       {/* Stories Hook */}
-      <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+      <div className="flex gap-4 overflow-x-auto pb-6 scrollbar-hide snap-x">
         {stories.map((story) => (
           <motion.div
             key={story.id}
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="flex-shrink-0 w-24 h-40 rounded-2xl overflow-hidden border-2 border-blue-500/30 p-0.5 bg-gradient-to-b from-blue-500/20 to-transparent"
+            whileHover={{ scale: 1.05 }}
+            className="flex-shrink-0 w-28 h-48 rounded-[2rem] overflow-hidden border-2 border-white/5 p-0.5 bg-white/5 snap-start shadow-xl"
           >
-            <div className="w-full h-full rounded-xl overflow-hidden relative">
+            <div className="w-full h-full rounded-[1.8rem] overflow-hidden relative">
               <img src={story.mediaUrl} className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+              <div className="absolute bottom-3 left-3 flex flex-col">
+                <span className="text-[6px] text-white/40 uppercase font-black tracking-widest">Story node</span>
+                <span className="text-[8px] text-white/80 font-bold">RECENT_SIG</span>
+              </div>
             </div>
           </motion.div>
         ))}
+        {stories.length === 0 && (
+          <div className="flex-shrink-0 w-28 h-48 rounded-[2rem] border-2 border-dashed border-white/5 flex flex-col items-center justify-center text-white/10 gap-2">
+            <Plus size={20} />
+            <span className="text-[8px] uppercase font-black">No Signal</span>
+          </div>
+        )}
       </div>
 
       {/* Main Feed */}

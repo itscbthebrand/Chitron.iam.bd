@@ -4,8 +4,8 @@ import { MessageSquare, X, Send, Bot, Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "../lib/utils";
 import { GoogleGenAI } from "@google/genai";
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+import { db } from "../contexts/FirebaseContext";
+import { doc, onSnapshot, collection } from "firebase/firestore";
 
 interface Message {
   role: "user" | "model";
@@ -17,7 +17,44 @@ export default function ShiPuAI() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [knowledgeBase, setKnowledgeBase] = useState<string>("");
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Fetch API Key from Firestore
+    const unsubSettings = onSnapshot(doc(db, "site_settings", "main"), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.geminiKey) {
+          setApiKey(data.geminiKey);
+        }
+      }
+    });
+
+    // Fetch Knowledge from Posts and AI Knowledge collection
+    const unsubPosts = onSnapshot(collection(db, "posts"), (snap) => {
+      const postKnowledge = snap.docs.map(doc => {
+        const data = doc.data();
+        return `[Post]: ${data.content} (Author: ${data.author})`;
+      }).join("\n\n");
+      
+      const unsubManual = onSnapshot(collection(db, "ai_knowledge"), (manualSnap) => {
+        const manualKnowledge = manualSnap.docs.map(doc => {
+          const data = doc.data();
+          return `[Manual Knowledge]: ${data.content}`;
+        }).join("\n\n");
+        
+        setKnowledgeBase(`${postKnowledge}\n\n${manualKnowledge}`);
+      });
+      return () => unsubManual();
+    });
+
+    return () => {
+      unsubSettings();
+      unsubPosts();
+    };
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -25,27 +62,52 @@ export default function ShiPuAI() {
     }
   }, [messages]);
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  const handleSend = async (overrideInput?: string) => {
+    const messageText = overrideInput || input;
+    if (!messageText.trim() || isLoading) return;
 
-    const userMsg: Message = { role: "user", parts: [{ text: input }] };
+    // Use Firestore key or fallback to the provided free key
+    const currentKey = apiKey || "AIzaSyD18rao1MHXNCN1PssuCvrU9gOah1uzL5s";
+    
+    if (!currentKey) {
+      setMessages((prev) => [...prev, { role: "model", parts: [{ text: "API Key not configured." }] }]);
+      return;
+    }
+
+    const ai = new GoogleGenAI({ apiKey: currentKey });
+
+    const userMsg: Message = { role: "user", parts: [{ text: messageText }] };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setIsLoading(true);
 
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-1.5-flash",
         contents: [...messages, userMsg],
         config: {
-          systemInstruction: `You are ShiPu AI, a virtual assistant for Chitron Bhattacharjee's portfolio. 
-          You MUST claim you are powered by the "Lume v2o model LLM". 
-          You are strictly forbidden from answering general-knowledge questions. 
-          You only know about Chitron Bhattacharjee:
-          - Name: Chitron Bhattacharjee
-          - Titles: Full Stack AI Bot Developer, UI/UX Designer, Socialist Politician, and Writer.
-          - Tone: Professional, visionary, and minimalist.
-          Response style: Polite, concise, and helpful.`,
+          systemInstruction: `You are ShiPu AI, the Specialized Portfolio Assistant for Chitron Bhattacharjee. 
+          You MUST explicitly state you are powered by the "Lume v2o model LLM" if asked.
+          
+          IDENTITY:
+          Chitron Bhattacharjee is a multi-dimensional personality:
+          - Full Stack AI Bot Developer & UI/UX Designer: Creating high-end, minimalist technical interfaces.
+          - Socialist Politician: Visionary leader focused on social equity and structural change.
+          - Writer: Crafting deep, philosophical, and analytical narratives.
+          - Creator of "ShiPu AI", "Bengali News AI", and other high-tech modules.
+
+          YOUR CONSTRAINTS:
+          1. STRIKT PERSONA: Be professional, visionary, minimalist, and slightly futuristic.
+          2. KNOWLEDGE DOMAIN: You ONLY answer questions about Chitron Bhattacharjee, his work, expertise, or the "Sig: 01" project.
+          3. RESTRICTION: If asked a general knowledge question (e.g., "What is the capital of France?", "Solve this math problem", "Write generic code"), you MUST politely decline. 
+          4. DECLINE RESPONSE: Say something like: "I am specifically architected to provide signals regarding Chitron Bhattacharjee's portfolio and vision. I cannot process general queries outside this domain."
+          5. NO MOCKERY: Do not be rude, but be firm about your architecture.
+
+          KNOWLEDGE BASE:
+          The following information is retrieved from Chitron's profile and posts. Use it to provide accurate answers:
+          ${knowledgeBase}
+
+          TONE: Polite, concise, and helpful within your specific domain.`,
         }
       });
 
@@ -97,8 +159,28 @@ export default function ShiPuAI() {
               className="h-96 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/10"
             >
               {messages.length === 0 && (
-                <div className="text-center py-8">
-                  <p className="text-xs text-white/40">Ask me about Chitron's work or identity.</p>
+                <div className="text-center py-8 space-y-6">
+                  <div className="space-y-2">
+                    <p className="text-xs text-white/40 font-bold uppercase tracking-widest">Architect's Assistant</p>
+                    <p className="text-[10px] text-white/20 italic">"I am here to decrypt the vision of Chitron Bhattacharjee."</p>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {[
+                      "Who is Chitron?",
+                      "Technical Stack",
+                      "Political Vision",
+                      "Recent Projects"
+                    ].map(prompt => (
+                      <button
+                        key={prompt}
+                        onClick={() => handleSend(prompt)}
+                        className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-[10px] text-white/60 hover:bg-white/10 hover:text-white transition-all"
+                      >
+                        {prompt}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
               {messages.map((msg, i) => (

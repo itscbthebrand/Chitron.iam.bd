@@ -11,6 +11,7 @@ export default function Messages() {
   const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -31,8 +32,9 @@ export default function Messages() {
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || !user) return;
+    if (!input.trim() || !user || sending) return;
 
+    setSending(true);
     const msg = input;
     setInput("");
 
@@ -57,6 +59,8 @@ export default function Messages() {
       });
     } catch (err) {
       console.error(err);
+    } finally {
+      setSending(false);
     }
   };
 
@@ -141,13 +145,16 @@ export default function Messages() {
             />
             <button 
               type="submit"
-              disabled={!input.trim()}
+              disabled={!input.trim() || sending}
               className="absolute right-2 top-1/2 -translate-y-1/2 p-2.5 text-blue-400 hover:text-blue-300 disabled:opacity-30 transition-colors"
             >
-              <Send size={20} />
+              {sending ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
             </button>
           </div>
         </form>
+        <div className="p-4 text-center opacity-10 text-[8px] uppercase tracking-widest font-black">
+           /** Author: Chitron Bhattacharjee **/
+        </div>
       </div>
     </div>
   );

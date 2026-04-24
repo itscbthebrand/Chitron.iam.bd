@@ -103,6 +103,10 @@ export default function About() {
              </div>
           </div>
         </section>
+
+        <div className="pt-12 text-center opacity-10 text-[8px] uppercase tracking-widest font-black">
+           /** Author: Chitron Bhattacharjee **/
+        </div>
       </div>
     </div>
   );

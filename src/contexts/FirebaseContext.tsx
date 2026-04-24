@@ -88,9 +88,30 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signInEmail = async (loginId: string, pass: string) => {
-    // Basic logic: if loginId is email, use it. If not, we might need a lookup (index) in real apps.
-    // For this prototype, we assume loginId is email or we would query Firestore users collection first.
-    await signInWithEmailAndPassword(auth, loginId, pass);
+    let email = loginId;
+
+    // If it's not an email, try finding user by username or phone
+    if (!loginId.includes("@")) {
+      const { collection, query, where, getDocs, limit } = await import("firebase/firestore");
+      // Search for username
+      const qUser = query(collection(db, "users"), where("username", "==", loginId), limit(1));
+      const snapUser = await getDocs(qUser);
+      
+      if (!snapUser.empty) {
+        email = snapUser.docs[0].data().email;
+      } else {
+        // Search for phone
+        const qPhone = query(collection(db, "users"), where("phoneNumber", "==", loginId), limit(1));
+        const snapPhone = await getDocs(qPhone);
+        if (!snapPhone.empty) {
+          email = snapPhone.docs[0].data().email;
+        } else {
+          throw new Error("No user found with this identifier.");
+        }
+      }
+    }
+
+    await signInWithEmailAndPassword(auth, email, pass);
   };
 
   const logout = async () => {

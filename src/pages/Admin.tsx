@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Plus, Image as ImageIcon, Trash2, LogOut, Users, MessageSquare, BarChart2, Shield, Lock, Smartphone, Key, Loader2, CheckCircle, Smartphone as SmartphoneIcon } from "lucide-react";
+import { Plus, Image as ImageIcon, Trash2, LogOut, Users, MessageSquare, BarChart2, Shield, Lock, Smartphone, Key, Loader2, CheckCircle, Smartphone as SmartphoneIcon, Globe, Cpu, Brain, Database, Edit3, Trash } from "lucide-react";
 import { useFirebase } from "../contexts/FirebaseContext";
 import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, deleteDoc, doc, limit } from "firebase/firestore";
 import { db } from "../contexts/FirebaseContext";
@@ -10,10 +10,22 @@ export default function Admin() {
   const { user, logout } = useFirebase();
   const [content, setContent] = useState("");
   const [mediaUrl, setMediaUrl] = useState("");
-  const [activeTab, setActiveTab] = useState<"posts" | "messages" | "logs" | "security">("posts");
+  const [activeTab, setActiveTab] = useState<"posts" | "messages" | "logs" | "security" | "ai">("posts");
   const [logs, setLogs] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
   const [allPosts, setAllPosts] = useState<any[]>([]);
+  const [aiKnowledge, setAiKnowledge] = useState<any[]>([]);
+  const [newKnowledge, setNewKnowledge] = useState("");
+  const [isDataLoading, setIsDataLoading] = useState(true);
+  
+  // Site Settings
+  const [siteSettings, setSiteSettings] = useState({
+    profilePhoto: "",
+    coverPhoto: "",
+    geminiKey: "AIzaSyD18rao1MHXNCN1PssuCvrU9gOah1uzL5s"
+  });
+  
+  const [isActionLoading, setIsActionLoading] = useState(false);
   
   // Auth state
   const [isFullyVerified, setIsFullyVerified] = useState(false);
@@ -47,16 +59,29 @@ export default function Admin() {
 
     const unsubMsgs = onSnapshot(query(collection(db, "messages"), orderBy("timestamp", "desc")), (snaps) => {
       setMessages(snaps.docs.map(d => ({ id: d.id, ...d.data() })));
+      setIsDataLoading(false);
     });
 
     const unsubPosts = onSnapshot(query(collection(db, "posts"), orderBy("createdAt", "desc")), (snaps) => {
       setAllPosts(snaps.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
+    const unsubAI = onSnapshot(query(collection(db, "ai_knowledge"), orderBy("createdAt", "desc")), (snaps) => {
+      setAiKnowledge(snaps.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    const { getDoc } = import("firebase/firestore");
+    onSnapshot(doc(db, "site_settings", "main"), (snap) => {
+      if (snap.exists()) {
+        setSiteSettings(snap.data() as any);
+      }
+    });
+
     return () => {
       unsubLogs();
       unsubMsgs();
       unsubPosts();
+      unsubAI();
     };
   }, [isFullyVerified, isCorrectEmail]);
 
@@ -99,42 +124,134 @@ export default function Admin() {
 
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim()) return;
+    if (!content.trim() || isActionLoading) return;
 
-    await addDoc(collection(db, "posts"), {
-      content,
-      mediaUrl,
-      author: "Chitron Bhattacharjee",
-      createdAt: serverTimestamp(),
-    });
+    setIsActionLoading(true);
+    try {
+      await addDoc(collection(db, "posts"), {
+        content,
+        mediaUrl,
+        author: "Chitron Bhattacharjee",
+        createdAt: serverTimestamp(),
+      });
+      setContent("");
+      setMediaUrl("");
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
 
-    setContent("");
-    setMediaUrl("");
+  const handleCreateStory = async () => {
+    if (!mediaUrl || isActionLoading) {
+      alert("Media URL required for story transmission.");
+      return;
+    }
+
+    setIsActionLoading(true);
+    try {
+      await addDoc(collection(db, "stories"), {
+        mediaUrl,
+        createdAt: serverTimestamp(),
+      });
+      setMediaUrl("");
+      alert("Story broadcasted.");
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsActionLoading(false);
+    }
   };
 
   const handleDeletePost = async (id: string) => {
     if (confirm("Permanently delete this transmission?")) {
-      await deleteDoc(doc(db, "posts", id));
+      setIsActionLoading(true);
+      try {
+        await deleteDoc(doc(db, "posts", id));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsActionLoading(false);
+      }
     }
   };
 
   const handleSetupMFA = async () => {
-    const res = await fetch("/api/admin/mfa-setup", { method: "POST" });
-    const data = await res.json();
-    setMfaSetup(data);
+    setIsActionLoading(true);
+    try {
+      const res = await fetch("/api/admin/mfa-setup", { method: "POST" });
+      const data = await res.json();
+      setMfaSetup(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsActionLoading(false);
+    }
   };
 
   const handleEnableMFA = async (code: string) => {
-    const res = await fetch("/api/admin/mfa-enable", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code }),
-    });
-    if (res.ok) {
-      setMfaStatus({ enabled: true });
-      setMfaSetup(null);
-    } else {
-      alert("Invalid code");
+    setIsActionLoading(true);
+    try {
+      const res = await fetch("/api/admin/mfa-enable", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+      if (res.ok) {
+        setMfaStatus({ enabled: true });
+        setMfaSetup(null);
+      } else {
+        alert("Invalid code");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleCreateKnowledge = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!newKnowledge.trim() || isActionLoading) return;
+
+    setIsActionLoading(true);
+    try {
+      await addDoc(collection(db, "ai_knowledge"), {
+        content: newKnowledge,
+        createdAt: serverTimestamp(),
+      });
+      setNewKnowledge("");
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleDeleteKnowledge = async (id: string) => {
+    if (confirm("Sync neural deletion? This memory will be purged.")) {
+      setIsActionLoading(true);
+      try {
+        await deleteDoc(doc(db, "ai_knowledge", id));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsActionLoading(false);
+      }
+    }
+  };
+
+  const handleUpdateSiteSettings = async () => {
+    setIsActionLoading(true);
+    const { updateDoc, setDoc } = await import("firebase/firestore");
+    try {
+      await setDoc(doc(db, "site_settings", "main"), siteSettings, { merge: true });
+      alert("Settings broadcasted successfully.");
+    } catch (e) {
+      alert("Error updating settings.");
+    } finally {
+      setIsActionLoading(false);
     }
   };
 
@@ -247,6 +364,7 @@ export default function Admin() {
             { id: "posts", icon: Plus, label: "Content Store" },
             { id: "messages", icon: MessageSquare, label: "Transmission Logs" },
             { id: "logs", icon: BarChart2, label: "System Recon" },
+            { id: "ai", icon: Brain, label: "Neural Center" },
             { id: "security", icon: Shield, label: "Vault Security" }
           ].map((item) => (
             <button
@@ -309,15 +427,21 @@ export default function Admin() {
                 </div>
 
                 <div className="flex gap-3">
-                  <button type="submit" className="flex-1 bg-white text-black py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-50 transition-all shadow-xl shadow-white/5">Deploy Feed</button>
-                  <button type="button" onClick={() => handleCreateStory()} className="px-8 bg-blue-600/10 border border-blue-500/20 text-blue-400 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-500/20 transition-all">Story</button>
+                  <button type="submit" disabled={isActionLoading} className="flex-1 bg-white text-black py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-50 transition-all shadow-xl shadow-white/5 flex items-center justify-center gap-2">
+                    {isActionLoading ? <Loader2 className="animate-spin" size={16} /> : "Deploy Feed"}
+                  </button>
+                  <button type="button" disabled={isActionLoading} onClick={() => handleCreateStory()} className="px-8 bg-blue-600/10 border border-blue-500/20 text-blue-400 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-500/20 transition-all flex items-center justify-center">
+                    {isActionLoading ? <Loader2 className="animate-spin" size={16} /> : "Story"}
+                  </button>
                 </div>
               </form>
 
               <div className="space-y-6">
                 <h3 className="text-[10px] uppercase tracking-[0.4em] font-black text-white/20">Active Transmissions</h3>
                 <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 scrollbar-thin">
-                  {allPosts.map(post => (
+                  {isDataLoading ? (
+                    <div className="py-8 flex justify-center"><Loader2 className="animate-spin text-white/20" /></div>
+                  ) : allPosts.map(post => (
                     <div key={post.id} className="p-5 rounded-2xl border border-white/5 bg-white/2 flex items-center justify-between group">
                       <div className="flex items-center gap-4 overflow-hidden">
                         {post.mediaUrl && <img src={post.mediaUrl} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />}
@@ -325,7 +449,8 @@ export default function Admin() {
                       </div>
                       <button 
                         onClick={() => handleDeletePost(post.id)}
-                        className="p-2.5 rounded-xl bg-red-500/10 text-red-500 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white"
+                        disabled={isActionLoading}
+                        className="p-2.5 rounded-xl bg-red-500/10 text-red-500 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white disabled:opacity-30"
                       >
                         <Trash2 size={16} />
                       </button>
@@ -345,7 +470,12 @@ export default function Admin() {
             </header>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {messages.map((msg) => (
+              {isDataLoading ? (
+                <div className="col-span-full py-20 flex flex-col items-center gap-4 text-white/20">
+                  <Loader2 className="animate-spin" />
+                  <span className="text-[10px] uppercase font-bold tracking-widest">Scanning signal history</span>
+                </div>
+              ) : messages.map((msg) => (
                 <div key={msg.id} className="p-8 rounded-[2rem] border border-white/5 bg-white/2 flex flex-col justify-between hover:bg-white/5 transition-all group">
                   <div className="space-y-5">
                     <div className="flex items-center justify-between">
@@ -359,7 +489,12 @@ export default function Admin() {
                   </div>
                   <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between">
                     <span className="text-[8px] text-blue-500/50 font-black uppercase tracking-widest">ID: {msg.sessionId}</span>
-                    <button onClick={() => deleteDoc(doc(db, "messages", msg.id))} className="p-2 text-white/10 hover:text-red-500 transition-colors">
+                    <button 
+                      onClick={() => {
+                        if (confirm("Delete this signal?")) deleteDoc(doc(db, "messages", msg.id));
+                      }} 
+                      className="p-2 text-white/10 hover:text-red-500 transition-colors"
+                    >
                       <Trash2 size={16} />
                     </button>
                   </div>
@@ -399,6 +534,91 @@ export default function Admin() {
           </div>
         )}
 
+        {activeTab === "ai" && (
+          <div className="max-w-5xl space-y-16">
+            <header className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="p-4 rounded-3xl bg-blue-500/10 text-blue-400">
+                  <Brain size={32} />
+                </div>
+                <div>
+                  <h1 className="text-5xl font-black tracking-tighter italic">NEURAL CENTER</h1>
+                  <p className="text-white/40 text-sm uppercase tracking-[0.2em] font-medium">ShiPu AI Core Memory & Knowledge Governance</p>
+                </div>
+              </div>
+            </header>
+
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-12">
+              <div className="xl:col-span-1 space-y-8">
+                <div className="p-8 rounded-[2.5rem] border border-white/10 bg-white/2 space-y-6">
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-black uppercase tracking-widest text-blue-400">Knowledge Injection</h3>
+                    <p className="text-[10px] text-white/30 leading-relaxed font-bold uppercase">Manually input deep-context data or paste documents into the AI core.</p>
+                  </div>
+                  
+                  <textarea
+                    value={newKnowledge}
+                    onChange={(e) => setNewKnowledge(e.target.value)}
+                    placeholder="Enter factual data or context here..."
+                    className="w-full bg-black/50 border border-white/10 rounded-2xl p-4 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 min-h-[200px] transition-all resize-none font-mono"
+                  />
+                  
+                  <button 
+                    onClick={() => handleCreateKnowledge()}
+                    disabled={isActionLoading || !newKnowledge.trim()}
+                    className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-500 transition-all flex items-center justify-center gap-2"
+                  >
+                    {isActionLoading ? <Loader2 className="animate-spin" size={16} /> : <Database size={16} />}
+                    Commit Memory
+                  </button>
+                </div>
+
+                <div className="p-8 rounded-[2.5rem] border border-blue-500/10 bg-blue-500/2 space-y-4">
+                  <div className="flex items-center gap-3 text-blue-500">
+                    <Shield size={16} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Logic Safeguard</span>
+                  </div>
+                  <p className="text-[9px] text-white/40 leading-relaxed font-bold uppercase">All public posts are automatically indexed. Delete or edit manual overrides if the AI exhibits cognitive dissonance or factual errors.</p>
+                </div>
+              </div>
+
+              <div className="xl:col-span-2 space-y-8">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[10px] uppercase tracking-[0.4em] font-black text-white/20">Memory Shards</h3>
+                  <span className="text-[10px] font-mono text-white/20">{aiKnowledge.length} Fragments Found</span>
+                </div>
+
+                <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-4 scrollbar-thin">
+                  {aiKnowledge.length === 0 && (
+                    <div className="py-20 text-center border border-dashed border-white/5 rounded-[2.5rem]">
+                      <p className="text-[10px] uppercase font-black text-white/10 tracking-widest">No custom memory shards initialized</p>
+                    </div>
+                  )}
+                  {aiKnowledge.map((item) => (
+                    <div key={item.id} className="p-6 rounded-3xl border border-white/5 bg-white/2 group hover:bg-white/5 transition-all">
+                      <div className="flex items-start justify-between gap-6">
+                        <div className="space-y-3 flex-1">
+                          <p className="text-xs text-white/80 leading-relaxed font-light">{item.content}</p>
+                          <div className="flex items-center gap-4">
+                            <span className="text-[8px] text-white/20 font-black uppercase tracking-widest">shard_id: {item.id.slice(0, 8)}</span>
+                            <span className="text-[8px] text-white/20 font-black uppercase tracking-widest">{item.createdAt?.toDate().toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => handleDeleteKnowledge(item.id)}
+                          className="p-2.5 rounded-xl bg-red-500/10 text-red-500 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeTab === "security" && (
           <div className="max-w-2xl space-y-12">
             <header className="space-y-2">
@@ -424,6 +644,8 @@ export default function Admin() {
                     <label className="text-[10px] uppercase tracking-widest font-bold text-white/40">Profile Photo (IK URL)</label>
                     <input 
                       type="url"
+                      value={siteSettings.profilePhoto}
+                      onChange={e => setSiteSettings({...siteSettings, profilePhoto: e.target.value})}
                       placeholder="https://ik.imagekit.io/..."
                       className="w-full bg-black border border-white/10 rounded-xl py-3 px-4 text-xs font-mono"
                     />
@@ -432,11 +654,15 @@ export default function Admin() {
                     <label className="text-[10px] uppercase tracking-widest font-bold text-white/40">Cover Photo (IK URL)</label>
                     <input 
                       type="url"
+                      value={siteSettings.coverPhoto}
+                      onChange={e => setSiteSettings({...siteSettings, coverPhoto: e.target.value})}
                       placeholder="https://ik.imagekit.io/..."
                       className="w-full bg-black border border-white/10 rounded-xl py-3 px-4 text-xs font-mono"
                     />
                   </div>
-                  <button className="w-full bg-white text-black py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-50 transition-all">Broadcast Global UI</button>
+                  <button onClick={handleUpdateSiteSettings} disabled={isActionLoading} className="w-full bg-white text-black py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-50 transition-all flex items-center justify-center gap-2">
+                    {isActionLoading ? <Loader2 className="animate-spin" size={14} /> : "Broadcast Global UI"}
+                  </button>
                 </div>
               </div>
 
@@ -457,11 +683,15 @@ export default function Admin() {
                     <label className="text-[10px] uppercase tracking-widest font-bold text-white/40">Gemini Key (Vaulted)</label>
                     <input 
                       type="password"
+                      value={siteSettings.geminiKey}
+                      onChange={e => setSiteSettings({...siteSettings, geminiKey: e.target.value})}
                       placeholder="AIzaSyB..."
                       className="w-full bg-black border border-white/10 rounded-xl py-3 px-4 text-xs font-mono"
                     />
                   </div>
-                  <button className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-500 transition-all">Rotate Token</button>
+                  <button onClick={handleUpdateSiteSettings} disabled={isActionLoading} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-500 transition-all flex items-center justify-center gap-2">
+                    {isActionLoading ? <Loader2 className="animate-spin" size={14} /> : "Rotate Token"}
+                  </button>
                 </div>
               </div>
 
@@ -477,7 +707,9 @@ export default function Admin() {
                     </div>
                   </div>
                   {!mfaStatus.enabled && !mfaSetup && (
-                    <button onClick={handleSetupMFA} className="px-6 py-2.5 rounded-xl bg-white text-black text-[10px] font-black uppercase tracking-widest hover:bg-blue-50 transition-all">Initialize</button>
+                    <button onClick={handleSetupMFA} disabled={isActionLoading} className="px-6 py-2.5 rounded-xl bg-white text-black text-[10px] font-black uppercase tracking-widest hover:bg-blue-50 transition-all flex items-center justify-center gap-2">
+                      {isActionLoading ? <Loader2 className="animate-spin" size={14} /> : "Initialize"}
+                    </button>
                   )}
                 </div>
 

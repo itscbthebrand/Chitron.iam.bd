@@ -121,6 +121,9 @@ export default function Profile() {
             </div>
           </form>
         </div>
+        <div className="pt-20 text-center opacity-10 text-[8px] uppercase tracking-widest font-black">
+           /** Author: Chitron Bhattacharjee **/
+        </div>
       </div>
     </div>
   );
